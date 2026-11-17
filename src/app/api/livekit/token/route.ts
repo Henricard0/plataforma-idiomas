@@ -1,8 +1,21 @@
 import { NextResponse } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
 import { getViewer } from "@/lib/auth";
-import { requireEnv } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+
+/** Lê as chaves do LiveKit no momento da requisição, sem espaços colados por engano. */
+function livekitConfig() {
+  const env = process.env;
+  const url = (env.LIVEKIT_URL ?? env["NEXT_PUBLIC_LIVEKIT_URL"] ?? "").trim();
+  const apiKey = (env.LIVEKIT_API_KEY ?? "").trim();
+  const apiSecret = (env.LIVEKIT_API_SECRET ?? "").trim();
+  const missing = [
+    !url && "NEXT_PUBLIC_LIVEKIT_URL",
+    !apiKey && "LIVEKIT_API_KEY",
+    !apiSecret && "LIVEKIT_API_SECRET",
+  ].filter((name): name is string => Boolean(name));
+  return { url, apiKey, apiSecret, missing };
+}
 
 function fail(status: number, error: string) {
   return NextResponse.json({ error }, { status });
@@ -16,8 +29,12 @@ function fail(status: number, error: string) {
 export async function POST(request: Request) {
   const viewer = await getViewer();
   if (!viewer) return fail(401, "Faça login para entrar na sala.");
-  if (!process.env.LIVEKIT_API_KEY || !process.env.LIVEKIT_API_SECRET || !process.env.NEXT_PUBLIC_LIVEKIT_URL) {
-    return fail(503, "O vídeo ainda não foi configurado (LiveKit). Avise o administrador.");
+  const livekit = livekitConfig();
+  if (livekit.missing.length > 0) {
+    return fail(
+      503,
+      `O vídeo ainda não foi configurado. Falta no Vercel (Settings → Environment Variables): ${livekit.missing.join(", ")}.`,
+    );
   }
 
   const body = (await request.json().catch(() => null)) as { kind?: string; id?: string } | null;
@@ -59,7 +76,7 @@ export async function POST(request: Request) {
     isAdmin = isHost;
   }
 
-  const token = new AccessToken(requireEnv("LIVEKIT_API_KEY"), requireEnv("LIVEKIT_API_SECRET"), {
+  const token = new AccessToken(livekit.apiKey, livekit.apiSecret, {
     identity: viewer.id,
     name: viewer.fullName,
     ttl: "4h",
@@ -76,7 +93,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     token: await token.toJwt(),
-    serverUrl: requireEnv("NEXT_PUBLIC_LIVEKIT_URL"),
+    serverUrl: livekit.url,
     canPublish,
   });
 }
