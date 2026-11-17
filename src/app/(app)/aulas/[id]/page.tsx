@@ -88,6 +88,7 @@ export default async function ClassPage({ params }: PageProps<"/aulas/[id]">) {
           <VideoRoom
             kind="class"
             id={cls.id}
+            title={cls.title}
             joinLabel={happening ? "Entrar na aula" : "Entrar na sala"}
             description={
               happening

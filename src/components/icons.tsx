@@ -138,3 +138,15 @@ export const CalendarIcon = (p: IconProps) => (
     <path d="M3.5 10h17M8 3v4M16 3v4" />
   </Svg>
 );
+
+export const ExpandIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+  </Svg>
+);
+
+export const ShrinkIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" />
+  </Svg>
+);

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireViewer } from "@/lib/auth";
@@ -99,39 +100,11 @@ export default async function LivePage({ params }: PageProps<"/lives/[id]">) {
           ) : null}
         </div>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
-          <div className="min-w-0">
-            {live.status === "ended" ? (
-              <div className="flex aspect-video w-full items-center justify-center rounded-xl bg-[#111] px-6 text-center text-sm text-white/70">
-                Esta live já terminou. Obrigado a todos que participaram!
-              </div>
-            ) : isHost ? (
-              <VideoRoom
-                kind="live"
-                id={live.id}
-                joinLabel="Abrir estúdio de transmissão"
-                description={
-                  live.status === "live"
-                    ? "Você está ao vivo. Entre na sala para transmitir câmera e tela."
-                    : "Entre para testar câmera e microfone. O público só consegue entrar depois que você clicar em “Iniciar live”."
-                }
-              />
-            ) : live.status === "live" ? (
-              <VideoRoom kind="live" id={live.id} joinLabel="Assistir à live" description="A live está acontecendo agora." />
-            ) : (
-              <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-xl bg-[#111] px-6 text-center text-white">
-                <p className="font-medium">A live começa em {formatDateTime(live.scheduled_at)}</p>
-                <p className="text-sm text-white/70">Deixe esta página aberta: ela atualiza sozinha quando começar.</p>
-              </div>
-            )}
-            {live.description ? (
-              <p className="mt-5 max-w-2xl text-[15px] leading-relaxed whitespace-pre-wrap text-ink/85">{live.description}</p>
-            ) : null}
-          </div>
-
-          {conversation && chat ? (
-            <div>
-              <h2 className="mb-2 text-sm font-semibold">Chat da live</h2>
+        <LiveBody
+          live={live}
+          isHost={isHost}
+          chatPanel={
+            conversation && chat ? (
               <ChatPanel
                 conversationId={conversation.id}
                 viewerId={viewer.id}
@@ -141,10 +114,71 @@ export default async function LivePage({ params }: PageProps<"/lives/[id]">) {
                 placeholder="Mande sua pergunta…"
                 className="h-[60vh] min-h-[380px]"
               />
-            </div>
-          ) : null}
-        </div>
+            ) : null
+          }
+        />
       )}
     </>
+  );
+}
+
+type LiveInfo = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  scheduled_at: string;
+};
+
+/** Live em andamento (ou estúdio do professor): sala de vídeo com o chat ao lado. Senão, aviso + chat. */
+function LiveBody({ live, isHost, chatPanel }: { live: LiveInfo; isHost: boolean; chatPanel: ReactNode }) {
+  const descriptionBlock = live.description ? (
+    <p className="mt-5 max-w-2xl text-[15px] leading-relaxed whitespace-pre-wrap text-ink/85">{live.description}</p>
+  ) : null;
+  const canJoin = isHost ? live.status !== "ended" : live.status === "live";
+
+  if (canJoin) {
+    return (
+      <VideoRoom
+        kind="live"
+        id={live.id}
+        title={live.title}
+        joinLabel={isHost ? "Abrir estúdio de transmissão" : "Assistir à live"}
+        description={
+          !isHost
+            ? "A live está acontecendo agora."
+            : live.status === "live"
+              ? "Você está ao vivo. Entre na sala para transmitir câmera e tela."
+              : "Entre para testar câmera e microfone. O público só consegue entrar depois que você clicar em “Iniciar live”."
+        }
+        sidebar={chatPanel}
+        sidebarTitle="Chat da live"
+        footer={descriptionBlock}
+      />
+    );
+  }
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+      <div className="min-w-0">
+        {live.status === "ended" ? (
+          <div className="flex aspect-video w-full items-center justify-center rounded-xl bg-[#111] px-6 text-center text-sm text-white/70">
+            Esta live já terminou. Obrigado a todos que participaram!
+          </div>
+        ) : (
+          <div className="flex aspect-video w-full flex-col items-center justify-center gap-2 rounded-xl bg-[#111] px-6 text-center text-white">
+            <p className="font-medium">A live começa em {formatDateTime(live.scheduled_at)}</p>
+            <p className="text-sm text-white/70">Deixe esta página aberta: ela atualiza sozinha quando começar.</p>
+          </div>
+        )}
+        {descriptionBlock}
+      </div>
+      {chatPanel ? (
+        <div>
+          <h2 className="mb-2 text-sm font-semibold">Chat da live</h2>
+          {chatPanel}
+        </div>
+      ) : null}
+    </div>
   );
 }

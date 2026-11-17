@@ -63,3 +63,13 @@ body {
     @apply rounded-xl border border-line bg-surface;
   }
 }
+
+/* Sala de vídeo: botões só com ícone (os textos do LiveKit vêm em inglês).
+   O texto continua no HTML, então leitores de tela seguem anunciando o botão. */
+.lk-room-container .lk-control-bar :is(.lk-button, .lk-disconnect-button):not(.lk-button-menu) {
+  font-size: 0;
+  gap: 0;
+}
+.lk-room-container .lk-control-bar .lk-chat-toggle::after {
+  font-size: 12px; /* contador de mensagens novas */
+}
