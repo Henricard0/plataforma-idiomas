@@ -12,6 +12,34 @@ const LiveKitStage = dynamic(() => import("./livekit-stage"), {
 
 type Connection = { token: string; serverUrl: string; canPublish: boolean };
 
+/** Traduz os erros mais comuns do LiveKit para algo que o professor consiga resolver. */
+function describeConnectionError(error: Error) {
+  const text = `${error.name} ${error.message}`.toLowerCase();
+  if (text.includes("notallowed") || text.includes("permission")) {
+    return "O navegador bloqueou a câmera ou o microfone. Clique no cadeado ao lado do endereço do site e permita.";
+  }
+  if (
+    text.includes("401") ||
+    text.includes("unauthorized") ||
+    text.includes("invalid api key") ||
+    text.includes("invalid token") ||
+    text.includes("signature") ||
+    text.includes("not authorized")
+  ) {
+    return "O LiveKit recusou as chaves. Confira se LIVEKIT_API_KEY e LIVEKIT_API_SECRET foram copiadas do mesmo projeto do endereço em NEXT_PUBLIC_LIVEKIT_URL.";
+  }
+  if (
+    text.includes("signal") ||
+    text.includes("websocket") ||
+    text.includes("failed to fetch") ||
+    text.includes("network") ||
+    text.includes("timeout")
+  ) {
+    return "Não foi possível falar com o servidor de vídeo. Confira se NEXT_PUBLIC_LIVEKIT_URL está certo (começa com wss:// e termina com .livekit.cloud).";
+  }
+  return "Não foi possível entrar na sala.";
+}
+
 export function VideoRoom({
   kind,
   id,
@@ -25,11 +53,15 @@ export function VideoRoom({
 }) {
   const [connection, setConnection] = useState<Connection | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [detail, setDetail] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function join() {
     setLoading(true);
     setError(null);
+    setDetail(null);
+    setWarning(null);
     try {
       const res = await fetch("/api/livekit/token", {
         method: "POST",
@@ -57,22 +89,34 @@ export function VideoRoom({
           {loading ? "Entrando…" : joinLabel}
         </button>
         {error ? (
-          <p className="text-sm text-red-300" role="alert">
-            {error}
-          </p>
+          <div className="max-w-md" role="alert">
+            <p className="text-sm text-red-300">{error}</p>
+            {detail ? <p className="mt-1 font-mono text-xs break-words text-white/40">{detail}</p> : null}
+          </div>
         ) : null}
       </div>
     );
   }
 
   return (
-    <div className="h-[72vh] min-h-[420px] w-full overflow-hidden rounded-xl bg-[#111]">
+    <div className="relative h-[72vh] min-h-[420px] w-full overflow-hidden rounded-xl bg-[#111]">
+      {warning ? (
+        <p className="absolute inset-x-0 top-0 z-10 bg-amber-100 px-4 py-2 text-center text-sm text-amber-900" role="alert">
+          {warning}
+        </p>
+      ) : null}
       <LiveKitStage
         token={connection.token}
         serverUrl={connection.serverUrl}
         publish={connection.canPublish}
         mode={kind === "live" ? "broadcast" : "conference"}
         onLeave={() => setConnection(null)}
+        onError={(e) => {
+          setError(describeConnectionError(e));
+          setDetail(e.message);
+          setConnection(null);
+        }}
+        onDeviceWarning={setWarning}
       />
     </div>
   );

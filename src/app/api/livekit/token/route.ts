@@ -6,9 +6,11 @@ import { createClient } from "@/lib/supabase/server";
 /** Lê as chaves do LiveKit no momento da requisição, sem espaços colados por engano. */
 function livekitConfig() {
   const env = process.env;
-  const url = (env.LIVEKIT_URL ?? env["NEXT_PUBLIC_LIVEKIT_URL"] ?? "").trim();
-  const apiKey = (env.LIVEKIT_API_KEY ?? "").trim();
-  const apiSecret = (env.LIVEKIT_API_SECRET ?? "").trim();
+  // Tira espaços e aspas que às vezes vêm junto quando a chave é colada.
+  const clean = (value: string | undefined) => (value ?? "").trim().replace(/^["']+|["']+$/g, "").trim();
+  const url = clean(env.LIVEKIT_URL ?? env["NEXT_PUBLIC_LIVEKIT_URL"]);
+  const apiKey = clean(env.LIVEKIT_API_KEY);
+  const apiSecret = clean(env.LIVEKIT_API_SECRET);
   const missing = [
     !url && "NEXT_PUBLIC_LIVEKIT_URL",
     !apiKey && "LIVEKIT_API_KEY",

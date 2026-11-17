@@ -24,12 +24,16 @@ export default function LiveKitStage({
   publish,
   mode,
   onLeave,
+  onError,
+  onDeviceWarning,
 }: {
   token: string;
   serverUrl: string;
   publish: boolean;
   mode: "conference" | "broadcast";
   onLeave: () => void;
+  onError: (error: Error) => void;
+  onDeviceWarning: (message: string) => void;
 }) {
   return (
     <LiveKitRoom
@@ -39,6 +43,14 @@ export default function LiveKitStage({
       video={publish}
       audio={publish}
       onDisconnected={onLeave}
+      onError={onError}
+      onMediaDeviceFailure={(_failure, kind) =>
+        onDeviceWarning(
+          kind === "audioinput"
+            ? "Não conseguimos usar o microfone. Confira a permissão no cadeado ao lado do endereço do site."
+            : "Não conseguimos usar a câmera. Confira a permissão no cadeado ao lado do endereço do site.",
+        )
+      }
       data-lk-theme="default"
       style={{ height: "100%" }}
     >
