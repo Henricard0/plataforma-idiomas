@@ -38,20 +38,22 @@ export default async function CommunityPage({ params }: PageProps<"/comunidades/
   const isMember = Boolean(me);
   const isModerator = me?.role === "moderator";
 
-  const { data: postRows } = await supabase
-    .from("posts")
-    .select(
-      "id, body, created_at, author_id, author:profiles!author_id(full_name), post_comments(id, body, created_at, author:profiles!author_id(full_name))",
-    )
-    .eq("community_id", community.id)
-    .order("created_at", { ascending: false })
-    .order("created_at", { referencedTable: "post_comments", ascending: true })
-    .limit(30);
+  const [{ data: postRows }, { data: conversation }] = await Promise.all([
+    supabase
+      .from("posts")
+      .select(
+        "id, body, created_at, author_id, author:profiles!author_id(full_name), post_comments(id, body, created_at, author:profiles!author_id(full_name))",
+      )
+      .eq("community_id", community.id)
+      .order("created_at", { ascending: false })
+      .order("created_at", { referencedTable: "post_comments", ascending: true })
+      .limit(30),
+    isMember
+      ? supabase.from("conversations").select("id").eq("community_id", community.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
   const posts = (postRows ?? []) as unknown as PostRow[];
 
-  const { data: conversation } = isMember
-    ? await supabase.from("conversations").select("id").eq("community_id", community.id).maybeSingle()
-    : { data: null };
   const chat = conversation ? await loadChat(supabase, conversation.id, 80) : null;
 
   return (

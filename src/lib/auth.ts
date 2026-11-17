@@ -16,22 +16,23 @@ export type Viewer = {
 /** Usuário logado + perfil. Memorizado por requisição. */
 export const getViewer = cache(async (): Promise<Viewer | null> => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  // Login validado localmente pela assinatura do token (sem ida ao servidor de autenticação).
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  if (!claims?.sub) return null;
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("full_name, role")
-    .eq("id", user.id)
+    .eq("id", claims.sub)
     .maybeSingle();
 
+  const email = typeof claims.email === "string" ? claims.email : "";
   const role = (profile?.role ?? "student") as Role;
   return {
-    id: user.id,
-    email: user.email ?? "",
-    fullName: profile?.full_name || user.email || "",
+    id: claims.sub,
+    email,
+    fullName: profile?.full_name || email,
     role,
     isTeacher: role === "teacher" || role === "admin",
   };

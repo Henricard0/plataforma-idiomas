@@ -29,20 +29,21 @@ export default async function LivesPage() {
   const supabase = await createClient();
 
   const since = new Date((await requestNow()) - 30 * 86_400_000).toISOString();
-  const { data } = await supabase
-    .from("lives")
-    .select("id, title, description, language, status, scheduled_at, course_id, host:profiles!host_id(full_name), course:courses(title)")
-    .gte("scheduled_at", since)
-    .order("scheduled_at", { ascending: true });
+  const [{ data }, { data: myCourses }] = await Promise.all([
+    supabase
+      .from("lives")
+      .select("id, title, description, language, status, scheduled_at, course_id, host:profiles!host_id(full_name), course:courses(title)")
+      .gte("scheduled_at", since)
+      .order("scheduled_at", { ascending: true }),
+    viewer.isTeacher
+      ? supabase.from("courses").select("id, title").eq("teacher_id", viewer.id).order("title")
+      : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+  ]);
 
   const lives = ((data ?? []) as unknown as LiveRow[]).map((l) => ({ ...l, host: one(l.host), course: one(l.course) }));
   const onAir = lives.filter((l) => l.status === "live");
   const upcoming = lives.filter((l) => l.status === "scheduled");
   const ended = lives.filter((l) => l.status === "ended").reverse().slice(0, 8);
-
-  const { data: myCourses } = viewer.isTeacher
-    ? await supabase.from("courses").select("id, title").eq("teacher_id", viewer.id).order("title")
-    : { data: [] as { id: string; title: string }[] };
 
   return (
     <>

@@ -12,12 +12,24 @@ export default async function MaterialsPage() {
   const viewer = await requireViewer();
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("materials")
-    .select(
-      "id, title, description, file_name, size_bytes, created_at, teacher_id, teacher:profiles!teacher_id(full_name), class:classes(title)",
-    )
-    .order("created_at", { ascending: false });
+  const since = new Date((await requestNow()) - 30 * 86_400_000).toISOString();
+  const [{ data }, { data: cls }] = await Promise.all([
+    supabase
+      .from("materials")
+      .select(
+        "id, title, description, file_name, size_bytes, created_at, teacher_id, teacher:profiles!teacher_id(full_name), class:classes(title)",
+      )
+      .order("created_at", { ascending: false }),
+    viewer.isTeacher
+      ? supabase
+          .from("classes")
+          .select("id, title, starts_at")
+          .eq("teacher_id", viewer.id)
+          .gte("starts_at", since)
+          .order("starts_at", { ascending: true })
+          .limit(30)
+      : Promise.resolve({ data: [] as { id: string; title: string }[] }),
+  ]);
 
   const items: MaterialItem[] = (data ?? []).map((m) => ({
     ...m,
@@ -25,17 +37,7 @@ export default async function MaterialsPage() {
     classTitle: one(m.class as unknown as { title: string } | null)?.title,
   }));
 
-  let classes: { id: string; title: string }[] = [];
-  if (viewer.isTeacher) {
-    const { data: cls } = await supabase
-      .from("classes")
-      .select("id, title, starts_at")
-      .eq("teacher_id", viewer.id)
-      .gte("starts_at", new Date((await requestNow()) - 30 * 86_400_000).toISOString())
-      .order("starts_at", { ascending: true })
-      .limit(30);
-    classes = cls ?? [];
-  }
+  const classes: { id: string; title: string }[] = cls ?? [];
 
   return (
     <>

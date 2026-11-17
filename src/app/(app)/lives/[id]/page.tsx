@@ -11,7 +11,7 @@ import { Badge, PageHeader } from "@/components/ui";
 import { ConfirmSubmit, SubmitButton } from "@/components/form-controls";
 import { ArrowLeftIcon, LockIcon, RadioIcon } from "@/components/icons";
 import { ChatPanel } from "@/components/chat/chat-panel";
-import { VideoRoom } from "@/components/video/video-room";
+import { CallLauncher } from "@/components/video/call-launcher";
 import { LiveStatusWatcher } from "../live-status-watcher";
 import { deleteLive, setLiveStatus } from "../actions";
 
@@ -32,11 +32,11 @@ export default async function LivePage({ params }: PageProps<"/lives/[id]">) {
   const isHost = live.host_id === viewer.id;
   const host = one(live.host as unknown as { full_name: string } | null);
   const course = one(live.course as unknown as { slug: string; title: string } | null);
-  const { data: canWatch } = await supabase.rpc("can_watch_live", { p_live: live.id });
-
-  const { data: conversation } = canWatch
-    ? await supabase.from("conversations").select("id").eq("live_id", live.id).maybeSingle()
-    : { data: null };
+  // O RLS já esconde a conversa de quem não pode assistir, então dá para buscar os dois juntos.
+  const [{ data: canWatch }, { data: conversation }] = await Promise.all([
+    supabase.rpc("can_watch_live", { p_live: live.id }),
+    supabase.from("conversations").select("id").eq("live_id", live.id).maybeSingle(),
+  ]);
   const chat = conversation ? await loadChat(supabase, conversation.id, 100) : null;
 
   return (
@@ -132,36 +132,25 @@ type LiveInfo = {
 
 /** Live em andamento (ou estúdio do professor): sala de vídeo com o chat ao lado. Senão, aviso + chat. */
 function LiveBody({ live, isHost, chatPanel }: { live: LiveInfo; isHost: boolean; chatPanel: ReactNode }) {
-  const descriptionBlock = live.description ? (
-    <p className="mt-5 max-w-2xl text-[15px] leading-relaxed whitespace-pre-wrap text-ink/85">{live.description}</p>
-  ) : null;
   const canJoin = isHost ? live.status !== "ended" : live.status === "live";
-
-  if (canJoin) {
-    return (
-      <VideoRoom
-        kind="live"
-        id={live.id}
-        title={live.title}
-        joinLabel={isHost ? "Abrir estúdio de transmissão" : "Assistir à live"}
-        description={
-          !isHost
-            ? "A live está acontecendo agora."
-            : live.status === "live"
-              ? "Você está ao vivo. Entre na sala para transmitir câmera e tela."
-              : "Entre para testar câmera e microfone. O público só consegue entrar depois que você clicar em “Iniciar live”."
-        }
-        sidebar={chatPanel}
-        sidebarTitle="Chat da live"
-        footer={descriptionBlock}
-      />
-    );
-  }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
       <div className="min-w-0">
-        {live.status === "ended" ? (
+        {canJoin ? (
+          <CallLauncher
+            href={`/sala/live/${live.id}`}
+            windowName={`sala-live-${live.id}`}
+            label={isHost ? "Abrir estúdio de transmissão" : "Assistir à live"}
+            description={
+              !isHost
+                ? "A live está acontecendo agora."
+                : live.status === "live"
+                  ? "Você está ao vivo. Abra o estúdio para transmitir câmera e tela."
+                  : "Abra o estúdio para testar câmera e microfone. O público só entra depois que você clicar em “Iniciar live”."
+            }
+          />
+        ) : live.status === "ended" ? (
           <div className="flex aspect-video w-full items-center justify-center rounded-xl bg-[#111] px-6 text-center text-sm text-white/70">
             Esta live já terminou. Obrigado a todos que participaram!
           </div>
@@ -171,7 +160,9 @@ function LiveBody({ live, isHost, chatPanel }: { live: LiveInfo; isHost: boolean
             <p className="text-sm text-white/70">Deixe esta página aberta: ela atualiza sozinha quando começar.</p>
           </div>
         )}
-        {descriptionBlock}
+        {live.description ? (
+          <p className="mt-5 max-w-2xl text-[15px] leading-relaxed whitespace-pre-wrap text-ink/85">{live.description}</p>
+        ) : null}
       </div>
       {chatPanel ? (
         <div>

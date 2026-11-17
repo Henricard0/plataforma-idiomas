@@ -9,7 +9,7 @@ import { formatDateTime, formatTime } from "@/lib/format";
 import { Avatar, Badge, PageHeader, Section } from "@/components/ui";
 import { ConfirmSubmit, SubmitButton } from "@/components/form-controls";
 import { ArrowLeftIcon } from "@/components/icons";
-import { VideoRoom } from "@/components/video/video-room";
+import { CallLauncher } from "@/components/video/call-launcher";
 import { MaterialList, type MaterialItem } from "../../materiais/material-list";
 import { MaterialUploader } from "../../materiais/material-uploader";
 import { startDirectConversation } from "../../mensagens/actions";
@@ -35,14 +35,16 @@ export default async function ClassPage({ params }: PageProps<"/aulas/[id]">) {
     .filter((p): p is Person => Boolean(p));
   const isOwner = cls.teacher_id === viewer.id;
 
-  const { data: materialRows } = await supabase
-    .from("materials")
-    .select("id, title, description, file_name, size_bytes, created_at, teacher_id")
-    .eq("class_id", cls.id)
-    .order("created_at", { ascending: false });
+  // Materiais e lista de alunos são independentes: busca os dois ao mesmo tempo.
+  const [{ data: materialRows }, roster] = await Promise.all([
+    supabase
+      .from("materials")
+      .select("id, title, description, file_name, size_bytes, created_at, teacher_id")
+      .eq("class_id", cls.id)
+      .order("created_at", { ascending: false }),
+    isOwner ? getRoster(supabase, viewer.id) : Promise.resolve([]),
+  ]);
   const materials: MaterialItem[] = (materialRows ?? []).map((m) => ({ ...m, classTitle: null }));
-
-  const roster = isOwner ? await getRoster(supabase, viewer.id) : [];
   const studentIds = new Set(students.map((s) => s.id));
 
   const start = new Date(cls.starts_at);
@@ -85,14 +87,13 @@ export default async function ClassPage({ params }: PageProps<"/aulas/[id]">) {
 
       <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0">
-          <VideoRoom
-            kind="class"
-            id={cls.id}
-            title={cls.title}
-            joinLabel={happening ? "Entrar na aula" : "Entrar na sala"}
+          <CallLauncher
+            href={`/sala/aula/${cls.id}`}
+            windowName={`sala-aula-${cls.id}`}
+            label={happening ? "Entrar na aula" : "Abrir sala de aula"}
             description={
               happening
-                ? "Câmera e microfone serão solicitados pelo navegador."
+                ? "A aula está acontecendo agora."
                 : `A aula está marcada para ${formatDateTime(start)}. Você pode entrar antes para testar câmera e microfone.`
             }
           />

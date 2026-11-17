@@ -29,9 +29,10 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims valida o login localmente (chave pública do projeto), sem ir ao servidor de
+  // autenticação a cada página; também renova a sessão quando o token expira.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims ?? null;
 
   const { pathname, search } = request.nextUrl;
 
