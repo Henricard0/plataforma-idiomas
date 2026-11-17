@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { VideoIcon } from "@/components/icons";
 
 // O LiveKit só roda no navegador.
@@ -57,6 +57,22 @@ export function VideoRoom({
   const [warning, setWarning] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Callbacks estáveis (useCallback): se mudarem a cada render, o LiveKit reconecta e a chamada cai.
+  const handleLeave = useCallback((message?: string, reason?: string) => {
+    setConnection(null);
+    setWarning(null);
+    if (message) {
+      setError((prev) => prev ?? message);
+      setDetail((prev) => prev ?? (reason ? `motivo: ${reason}` : null));
+    }
+  }, []);
+
+  const handleError = useCallback((e: Error) => {
+    setError(describeConnectionError(e));
+    setDetail(e.message);
+    setConnection(null);
+  }, []);
+
   async function join() {
     setLoading(true);
     setError(null);
@@ -101,21 +117,23 @@ export function VideoRoom({
   return (
     <div className="relative h-[72vh] min-h-[420px] w-full overflow-hidden rounded-xl bg-[#111]">
       {warning ? (
-        <p className="absolute inset-x-0 top-0 z-10 bg-amber-100 px-4 py-2 text-center text-sm text-amber-900" role="alert">
-          {warning}
-        </p>
+        <div
+          className="absolute inset-x-0 top-0 z-10 flex items-start gap-3 bg-amber-100 px-4 py-2 text-sm text-amber-900"
+          role="alert"
+        >
+          <p className="flex-1 text-center">{warning}</p>
+          <button type="button" className="shrink-0 font-medium underline" onClick={() => setWarning(null)}>
+            Fechar
+          </button>
+        </div>
       ) : null}
       <LiveKitStage
         token={connection.token}
         serverUrl={connection.serverUrl}
         publish={connection.canPublish}
         mode={kind === "live" ? "broadcast" : "conference"}
-        onLeave={() => setConnection(null)}
-        onError={(e) => {
-          setError(describeConnectionError(e));
-          setDetail(e.message);
-          setConnection(null);
-        }}
+        onLeave={handleLeave}
+        onError={handleError}
         onDeviceWarning={setWarning}
       />
     </div>
